@@ -1,0 +1,140 @@
+---
+title: "Practical 2 Week 1 Bioinformatics Essentials Course"
+author: "Dieter Stoker & Adrien Melquiond"
+date: "21-9-2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+if (!requireNamespace("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+#pasilla is data file with Drosophila RNA-seq data 
+BiocManager::install("pasilla")
+if(!require(pacman)) {
+install.packages("pacman"); require(pacman)}
+p_load(ggplot2, tidyverse, stringr, gganimate, png, gifski, Rtsne, uwot, broom)
+
+```
+
+
+
+##############################
+#
+#
+# ggplot intro
+#
+#
+##############################
+
+Welcome to the practical! Though you first encountered ggplot2 on Tuesday, we didn't go into the specifics. Ggplot2 is a powerful package based on the grammar of graphics. This means that plot construction is a layered affair, with data specified separately from the geometries, which are the ways to visualise that data (such as geom_point() for drawing the data as points, or geom_violin() for a violin plot). Here, let's focus on getting to know the ggplot syntax a bit better, before diving into advanced visualisation.
+
+Q1 Look at the iris dataset and describe what it contains.
+
+#Answer: It contains observations on the length and width of petals and sepals for 3 species of iris.
+
+
+```{r}
+data("iris")
+head(iris)
+str(iris)
+```
+
+
+Let's plot this data. The way ggplot constructs plots is by first designating a dataset and aesthetics (aes). Aesthetics define what visual elements will be used to visualise specific data features. In the code below, we define the x-axis aesthetic to show the length of sepals, the y-axis aesthetic to show their width, and the colour aesthetic to show the species of iris. We then add a geometry, telling ggplot that we want points. The nice thing is that these geometries automatically inherit the aesthetic mappings and data of the main plot call. Unless you specify that you don't want them to. The + operator is used to chain ggplot calls together when constructing a plot.  
+
+Q2 set geom_point's argument inherit.aes to FALSE. What happens? Why?
+
+#Now geom_point doesn't know what data columns to plot, since it doesn't know what aesthetic properties map to those data columns.
+
+Q3 Remove the inherit.aes argument. Add a rolling average describing the relationship between sepal length and width for each species by adding + geom_smooth() to the call below. 
+
+
+```{r}
+ggplot(data = iris, mapping = aes(x = Sepal.Length, y = Sepal.Width, colour = Species)) + geom_point()
+
+#Answer
+ggplot(data = iris, mapping = aes(x = Sepal.Length, y = Sepal.Width, colour = Species)) + geom_point() + geom_smooth()
+
+```
+Q4 Because ggplot knows that you want to separate groups by colour, it automatically makes this line for all species. But what if we wanted a model for all species together? Try to make one by setting the aes() of geom_smooth() manually.
+
+Q5 Now show the separate and combined rolling average in one plot!
+
+Q6 Finally, this smoothed curve is nice, but not really informative. Why don't we make a linear model of how sepal width depends on sepal length for each species. Do this below by changing the method argument of geom_smooth. Be sure to use ?geom_smooth if you get stuck!
+
+
+```{r}
+
+#Answer
+
+ggplot(data = iris, mapping = aes(x = Sepal.Length, y = Sepal.Width, colour = Species)) + geom_point() + geom_smooth(inherit.aes = FALSE, aes(x = Sepal.Length, y = Sepal.Width))
+
+ggplot(data = iris, mapping = aes(x = Sepal.Length, y = Sepal.Width, colour = Species)) + geom_point() + geom_smooth(inherit.aes = FALSE, aes(x = Sepal.Length, y = Sepal.Width)) + geom_smooth()
+
+ggplot(data = iris, mapping = aes(x = Sepal.Length, y = Sepal.Width, colour = Species)) + geom_point() +   geom_smooth(method = "lm")
+
+```
+
+
+That's looking nicer already. Now, a problem occurs if you want to plot r-squared and such. Namely: the linear model parameters are not easily saved in the plot. So a better idea would be to make the linear models yourself, and then plot them. Luckily, using some dplyr, that is very easy to do.
+
+#see here: https://www.r-bloggers.com/2016/09/running-a-model-on-separate-groups/ Not as easy as I thought...need to check Advanced R course, think it was easier there.
+
+
+```{r}
+fitModels = iris %>%
+  nest(-Species) %>%
+  mutate(fit    = map(data, ~ lm(Sepal.Width ~ Sepal.Length, data = .)),
+                                   result = map(fit, broom::augment)) %>% 
+  unnest(result)
+
+fitModels %>%
+ggplot(aes(x = Sepal.Length, y = .fitted, colour = Species)) +
+    geom_line() + geom_point(data = iris, aes(x= Sepal.Length, y = Sepal.Width, colour = Species))
+
+
+```
+
+
+
+#ideas:
+```{r}
+#Tell students that in this way you can't access the  parameters easily, need actual linear model for that:
+ggplotRegression <- function (fit) {
+
+require(ggplot2)
+
+ggplot(fit$model, aes_string(x = names(fit$model)[2], y = names(fit$model)[1])) + 
+  geom_point() +
+  stat_smooth(method = "lm", col = "red") +
+  labs(title = paste("Adj R2 = ",signif(summary(fit)$adj.r.squared, 5),
+                     "Intercept =",signif(fit$coef[[1]],5 ),
+                     " Slope =",signif(fit$coef[[2]], 5),
+                     " P =",signif(summary(fit)$coef[2,4], 5)))
+} 
+```
+
+
+
+
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
